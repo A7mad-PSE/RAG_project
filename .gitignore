@@ -1,0 +1,19 @@
+# Virtual environment
+.venv/
+venv/
+rag_env/
+
+# Generated vector database
+chroma_db/
+
+# Python
+__pycache__/
+*.pyc
+
+# Local documents (keep personal PDFs out of the repo)
+*.pdf
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
