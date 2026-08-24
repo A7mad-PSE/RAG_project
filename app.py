@@ -1,5 +1,7 @@
 import hashlib
 import io
+import os
+import shutil
 import tempfile
 
 import streamlit as st
@@ -10,6 +12,8 @@ from langchain_ollama import OllamaEmbeddings, OllamaLLM
 from langchain_chroma import Chroma
 from langchain_classic.chains import RetrievalQA
 from langchain_core.prompts import PromptTemplate
+
+from utils import ollama_error
 
 st.title("PDF Q&A with Ollama")
 
@@ -36,6 +40,12 @@ def load_pdf(path):
         return docs
 
     # No extractable text -> image-based PDF, run OCR
+    if not shutil.which("tesseract"):
+        raise ValueError(
+            "This PDF has no text layer (it looks scanned) and tesseract OCR "
+            "is not installed. Install it (see README) or use a text-based PDF."
+        )
+
     import fitz  # pymupdf
     import pytesseract
     from PIL import Image
@@ -60,7 +70,10 @@ def build_qa_chain(pdf_bytes):
         tmp_path = tmp.name
 
     # Load (with OCR fallback), chunk, embed, and store
-    docs = load_pdf(tmp_path)
+    try:
+        docs = load_pdf(tmp_path)
+    finally:
+        os.unlink(tmp_path)
     if not docs:
         raise ValueError("No text could be extracted from this PDF, even with OCR.")
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
@@ -90,18 +103,36 @@ def build_qa_chain(pdf_bytes):
 
 uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
 if uploaded_file:
-    qa_chain, chunks = build_qa_chain(uploaded_file.getvalue())
+    err = ollama_error()
+    if err:
+        st.error(err)
+        st.stop()
+
+    with st.spinner("Indexing PDF..."):
+        try:
+            qa_chain, chunks = build_qa_chain(uploaded_file.getvalue())
+        except ValueError as e:
+            st.error(str(e))
+            st.stop()
+        except Exception as e:
+            st.error(f"Could not process this PDF ({e.__class__.__name__}): {e}")
+            st.stop()
 
     st.success(f"PDF processed ({len(chunks)} text chunks)! Ask a question below.")
     query = st.text_input("Your question:")
-    if query:
+    if query.strip():
         with st.spinner("Thinking..."):
-            result = qa_chain.invoke({"query": query})
+            try:
+                result = qa_chain.invoke({"query": query.strip()})
+            except Exception as e:
+                st.error(f"Ollama request failed: {e}")
+                st.stop()
         st.write(result["result"])
 
         with st.expander("Sources"):
             for doc in result.get("source_documents", []):
-                page = doc.metadata.get("page", "?")
-                st.markdown(f"**Page {page + 1}**")
+                page = doc.metadata.get("page")
+                label = f"Page {page + 1}" if isinstance(page, int) else "Source"
+                st.markdown(f"**{label}**")
                 st.text(doc.page_content[:400])
                 st.divider()

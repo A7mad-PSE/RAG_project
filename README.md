@@ -11,6 +11,9 @@ using locally running models. No API keys, no cloud, no data leaving your machin
 ![Streamlit](https://img.shields.io/badge/UI-Streamlit-FF4B4B?logo=streamlit&logoColor=white)
 ![Ollama](https://img.shields.io/badge/LLM-Ollama-000000?logo=ollama&logoColor=white)
 ![Chroma](https://img.shields.io/badge/VectorDB-Chroma-F46C33)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+<img src="assets/demo.gif" alt="Demo: uploading a PDF, asking a question, getting an answer with source pages" width="720">
 
 </div>
 
@@ -43,6 +46,7 @@ flowchart LR
 - **OCR fallback** — scanned PDFs without a text layer are OCR'd automatically
 - **Per-PDF isolation** — every upload gets its own vector collection; documents never contaminate each other
 - **Source pages** — every answer shows the exact pages it came from
+- **Graceful failures** — clear messages when Ollama isn't running, models aren't pulled, or a PDF can't be parsed
 - **Persistent CLI demo** — `rag_demo.py` builds a reusable local database
 - **Fully offline** — models run on your hardware via Ollama
 
@@ -83,6 +87,8 @@ ollama pull nomic-embed-text
 ollama serve
 ```
 
+> Running Ollama on another machine or port? Set `OLLAMA_HOST` (e.g. `OLLAMA_HOST=http://192.168.1.20:11434`).
+
 **Web app**
 
 ```bash
@@ -105,7 +111,10 @@ Opens at `http://localhost:8501` — upload a PDF and ask away.
 RAG_project/
 ├── app.py              # Streamlit web app
 ├── rag_demo.py         # CLI demo with persistent vector DB
-├── requirements.txt
+├── utils.py            # shared Ollama health check
+├── requirements.txt    # pinned dependency versions
+├── LICENSE             # MIT
+├── assets/demo.gif     # demo animation (shown above)
 ├── chroma_db/          # generated at runtime (gitignored)
 └── .venv/              # virtual environment (gitignored)
 ```
@@ -117,3 +126,5 @@ RAG_project/
 | Handwritten PDFs | Not supported — classic OCR can't read handwriting reliably |
 | First question latency | Models load into RAM on first use (~10–30 s), then fast |
 | RAM footprint | ~3 GB while running (`llama3.2` 2 GB + embeddings) |
+| Hardware | Runs fine on CPU, but significantly faster with CUDA (NVIDIA) or Metal (Apple) — Ollama uses the GPU automatically when available |
+| Broad "summarize the whole document" questions | Answers are built from ~500-char retrieved chunks — specific questions work best; very broad ones may get a cautious answer |
